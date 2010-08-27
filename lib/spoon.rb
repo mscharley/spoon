@@ -35,19 +35,39 @@ module Spoon
     ffi_convention :stdcall
     
     attach_function :_create_process, :CreateProcessW, [:buffer_in, :pointer, :pointer, :pointer, :int, :int, :pointer, :buffer_in, :pointer, :pointer], :int
+    attach_function :_get_last_error, :GetLastError, [], :int
     
     class SecurityAttributes < FFI::Struct
-      layout :length, :int,                   # DWORD
-             :security_descriptor, :pointer,  # LPVOID
-             :inherit_handler, :int           # BOOL
+      layout  :length, :int,                   # DWORD
+              :security_descriptor, :pointer,  # LPVOID
+              :inherit_handler, :int           # BOOL
     end
     
-    class StartupInfo < FFI:Struct
-      
+    class StartupInfo < FFI::Struct
+      layout  :cb, :int,              # DWORD
+              :reserved, :pointer,    # LPTSTR
+              :desktop, :pointer,     # LPTSTR
+              :x, :int,               # DWORD
+              :y, :int,               # DWORD
+              :x_size, :int,          # DWORD
+              :y_size, :int,          # DWORD
+              :x_count_chars, :int,   # DWORD
+              :y_count_chars, :int,   # DWORD
+              :fill_attribute, :int,  # DWORD
+              :flags, :int,           # DWORD
+              :show_window, :short,   # WORD
+              :reserved_2_1, :short,  # WORD
+              :reserved_2_2, :int,    # LPBYTE
+              :std_input, :int,       # HANDLE
+              :std_output, :int,      # HANDLE
+              :std_error, :int        # HANDLE
     end
     
-    class ProcessInformation < FFI:Struct
-      
+    class ProcessInfo < FFI::Struct
+      layout  :process, :int,         # HANDLE
+              :thread, :int,          # HANDLE
+              :process_id, :int,      # DWORD
+              :thread_id, :int        # DWORD
     end
   rescue FFI::NotFoundError
   end
@@ -97,7 +117,10 @@ module Spoon
   end
   
   def self.spawn_cp(*args)
-    
+    cp_args = _prepare_cp_args(args)
+    if _create_process(*cp_args) == 0
+      raise "Win32 error: #{_get_last_error}"
+    end
   end
   
   def self.spawnp_spawn(*args)
@@ -122,6 +145,15 @@ module Spoon
     env_ary.put_array_of_pointer(0, env_ptrs)
     
     [pid_ptr, args[0], nil, nil, args_ary, env_ary]
+  end
+  
+  def self._prepare_cp_args(args)
+    command = FFI::MemoryPointer.from_string(args.join(' '))
+    si = StartupInfo.new
+    puts si.size
+    si[:cb] = si.size
+    pi = ProcessInfo.new
+    [nil, command, nil, nil, 0, 0, nil, nil, si, pi]
   end
 end
 
