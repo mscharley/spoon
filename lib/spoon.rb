@@ -2,7 +2,6 @@ require 'ffi'
 
 module Spoon
   extend FFI::Library
-  ffi_lib 'c'
   
   # int
   # posix_spawn(pid_t *restrict pid, const char *restrict path,
@@ -10,14 +9,31 @@ module Spoon
   #     const posix_spawnattr_t *restrict attrp, char *const argv[restrict],
   #     char *const envp[restrict]);
   
-  attach_function :_posix_spawn, :posix_spawn, [:pointer, :string, :pointer, :pointer, :pointer, :pointer], :int
-  attach_function :_posix_spawnp, :posix_spawnp, [:pointer, :string, :pointer, :pointer, :pointer, :pointer], :int
+  begin
+    ffi_lib 'c'
+    
+    attach_function :_posix_spawn, :posix_spawn, [:pointer, :string, :pointer, :pointer, :pointer, :pointer], :int
+    attach_function :_posix_spawnp, :posix_spawnp, [:pointer, :string, :pointer, :pointer, :pointer, :pointer], :int
+  rescue FFI::NotFoundError
+  end
+  
+  def self.have_spawn?
+    begin
+      self.method(:_posix_spawn)
+    rescue NameError
+      false
+    end
+  end
+  
+  def self.supported?
+    have_spawn?
+  end
   
   def self.spawn(*args)
     spawn_args = _prepare_spawn_args(args)
     _posix_spawn(*spawn_args)
     spawn_args[0].read_int
-  end
+end
 
   def self.spawnp(*args)
     spawn_args = _prepare_spawn_args(args)
